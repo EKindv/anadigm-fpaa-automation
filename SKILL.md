@@ -1,4 +1,4 @@
-﻿---
+---
 name: anadigm-fpaa-automation
 description: Build, wire and simulate AnadigmDesigner2 (AD2) switched-capacitor FPAA circuits through COM automation on Windows. Use when a task involves AN231E04 / AN231E04-class FPAA design files (.ad2), AnadigmDesigner2, the "AD20" process, or reproducing / verifying an analog dynamical system (chaotic circuit, oscillator, filter) on an FPAA. Covers launching AD2 headless, eating its modal dialogs, adding and wiring CAMs including across chips, enumerating every CAM option and parameter, running the simulator and dumping waveforms to CSV.
 ---
@@ -97,9 +97,9 @@ for ($i = 0; $i -lt $cam.Options.Count; $i++) {
 a large mismatch means your coefficient is not what you think it is.
 
 Run `scripts/probe.ps1` against any `.ad2` to dump the whole catalog of what each
-CAM type accepts. See `reference/CAM_CATALOG.md` for the answers we already have.
-
-## 5. Wiring, including across chips
+CAM type accepts. `reference/CAM_CATALOG.md` lists **all 49 AnadigmApex CAMs**
+with their exact contact names, option strings and parameters - it is complete for
+AN231E04, so there is no need to guess or to consult a datasheet.
 
 Same chip: just connect two contacts.
 
@@ -227,11 +227,13 @@ scripts/probe.ps1              dump every CAM type / option / parameter of a doc
 scripts/build_example.ps1      full worked build (10 CAM, 2 chips, cross-chip IO)
 scripts/run_dump.ps1           open a doc, run, dump CSV
 scripts/verify_equations.py    recover state equations by regression
-scripts/suppress_dialogs.ps1   click the modal error box away (ticks "Don't show")
+scripts/catalog_dump.ps1       probe EVERY CAM of a library (49 on AN231E04, ~15 s)
+scripts/suppress_dialogs.ps1   answer the modal boxes from a helper process
 scripts/test_stall.ps1         regression test: valid / stalled / after-restart
 scripts/watchdog.ps1           legacy: closes dialogs blindly (see PITFALLS 19)
 reference/COM_API.md           verified API surface and object model
-reference/CAM_CATALOG.md       CAM types, contacts, options, parameters
+reference/CAM_CATALOG.md       ALL 49 AnadigmApex CAMs: contacts, exact option
+                               strings, parameters, plus field notes
 reference/PITFALLS.md          every trap, including the stall mechanism (19, 20)
 ```
 
