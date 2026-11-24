@@ -99,12 +99,34 @@ function AD2-FindCam {
 }
 
 # Add a CAM and name it. Returns the CAM object (or $null on failure).
+#
+# Do NOT blanket-retry the Add. "Not enough resources" and "is not a valid CAM"
+# are permanent failures, and their message is the single most useful text AD2
+# ever produces ("Not enough resources in chip FPAA1 for CAM
+# AnadigmApex\SumIntegrator"). Retrying 15 times turned a 0.2 s, perfectly
+# readable rejection into a 7 s wait plus a vague "FAIL add".
 function AD2-AddCam {
     param($Chip, [string]$Type, [string]$Name)
-    $r = AD2-Retry { $null = $Chip.Cams.Add($Type); return $Chip.Cams.Item($Chip.Cams.Count - 1) } ('add ' + $Name)
-    if ($r) { try { $r.Name = $Name } catch { } }
-    AD2-Log ('  add ' + $Name + ' (' + $Type + ')  cams=' + $Chip.Cams.Count)
-    return $r
+    $last = ''
+    for ($k = 0; $k -lt 15; $k++) {
+        try {
+            $null = $Chip.Cams.Add($Type)
+            $cam = $Chip.Cams.Item($Chip.Cams.Count - 1)
+            try { $cam.Name = $Name } catch { }
+            AD2-Log ('  add ' + $Name + ' (' + $Type + ')  cams=' + $Chip.Cams.Count)
+            return $cam
+        } catch {
+            $last = $_.Exception.Message.Split([char]10)[0]
+            if ($last -match 'Not enough resources|not a valid|Unknown CAM|invalid') {
+                AD2-Log ('  ADD REJECTED ' + $Name + ' (' + $Type + '): ' + $last)
+                AD2-Log ('  -> chip already holds ' + $Chip.Cams.Count + ' CAMs; a chip takes at most 8')
+                return $null
+            }
+            Start-Sleep -Milliseconds 400
+        }
+    }
+    AD2-Log ('  FAIL add ' + $Name + ' (' + $Type + '): ' + $last)
+    return $null
 }
 
 # Set an option by name. AD2 fails SILENTLY on a bad choice text, so check the

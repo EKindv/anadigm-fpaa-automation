@@ -325,3 +325,48 @@ list.
 state, or start from a template whose IO cells are all `Input`. When in doubt,
 open the saved document in the GUI once and look at the IO cells before scripting
 against it.
+
+---
+
+## 21. Resource exhaustion is the ONE error AD2 reports cleanly
+
+**Symptom** (the good case) `Cams.Add` throws, in about 0.2 s:
+
+```
+Not enough resources in chip FPAA1 for CAM AnadigmApex\SumIntegrator
+```
+
+That is the most legible message AD2 ever produces. Do not swallow it.
+
+**Trap** A blanket retry wrapper hides it: 15 retries turned a 0.2 s, perfectly
+readable rejection into a 7 s wait followed by a vague `FAIL add holdP`.
+`AD2-AddCam` now recognises `Not enough resources` / `not a valid` and returns
+`$null` immediately, logging the real message and the CAM count.
+
+**Numbers** A chip takes at most **8 CAMs** (4 CABs x 2). The 9th always fails.
+If you need more, use a second chip and cross-chip IO pairs (trap 14), or move a
+gain function into a per-pin `K` (see `reference/CAM_CATALOG.md`,
+`SumIntegrator`).
+
+**Not the same error class as trap 19.** A design that is *over-resourced on
+load* - a saved file that was legal when written - does not fail at `Add`; it
+fails at `Start`, which is the silent stall of trap 19. Detect that one with
+`CurrentIteration`.
+
+---
+
+## Safety note for trap 19: the 1.5 s check cannot kill a long run
+
+Measured on an 8 ms simulation that took **33.5 s** of wall clock:
+
+```
+t=0.2s   iteration=3
+t=1.2s   iteration=3027
+t=15.0s  iteration=32814
+t=31.9s  iteration=63558
+t=33.5s  finished, counter back to 0
+```
+
+The counter climbs monotonically from the very first clock, so by the 1.5 s check
+a healthy run is already in the thousands. Only a run frozen at exactly 0 is
+reported as `stalled`.
