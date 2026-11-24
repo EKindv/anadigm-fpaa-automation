@@ -1,4 +1,4 @@
----
+﻿---
 name: anadigm-fpaa-automation
 description: Build, wire and simulate AnadigmDesigner2 (AD2) switched-capacitor FPAA circuits through COM automation on Windows. Use when a task involves AN231E04 / AN231E04-class FPAA design files (.ad2), AnadigmDesigner2, the "AD20" process, or reproducing / verifying an analog dynamical system (chaotic circuit, oscillator, filter) on an FPAA. Covers launching AD2 headless, eating its modal dialogs, adding and wiring CAMs including across chips, enumerating every CAM option and parameter, running the simulator and dumping waveforms to CSV.
 ---
@@ -136,7 +136,7 @@ $g.Amplitude = 0.0; $g.DCOffset = 2.5; $g.CommonModeOffset = 0.0; $g.Frequency =
 - **Use the return value of `Add`.** After adding two generators,
   `SignalGenerators.Item(Count-1)` may hand you the wrong one and you will
   silently overwrite the other source.
-- Voltage mapping (measured): `V = (DCOffset - 2)/2 + (Amplitude/2)·sin(2πft)`.
+- Voltage mapping (measured): `V = (DCOffset - 2)/2 + (Amplitude/2)路sin(2蟺ft)`.
   So a DC of V volts needs `DCOffset = 2 + 2V`, `Amplitude = 0`.
 - Available generator properties: `Type`, `WaveForm`, `Phase`, `DutyCycle`,
   `PulseDelay`, `PulsePeriod`, `PulseWidth`, `WaveFormFile`.
@@ -231,6 +231,10 @@ scripts/catalog_dump.ps1       probe EVERY CAM of a library (49 on AN231E04, ~15
 scripts/suppress_dialogs.ps1   answer the modal boxes from a helper process
 scripts/test_stall.ps1         regression test: valid / stalled / after-restart
 scripts/watchdog.ps1           legacy: closes dialogs blindly (see PITFALLS 19)
+scripts/dialog_probe.ps1       what dialogs exist while a document opens
+scripts/win_enum.ps1           dump every Anadigm window + class + child text
+scripts/iter_trace.ps1         is CurrentIteration alive? (guards the 1.5 s check)
+scripts/resource_probe.ps1     fill a chip until AD2 refuses, and time it
 reference/COM_API.md           verified API surface and object model
 reference/CAM_CATALOG.md       ALL 49 AnadigmApex CAMs: contacts, exact option
                                strings, parameters, plus field notes
