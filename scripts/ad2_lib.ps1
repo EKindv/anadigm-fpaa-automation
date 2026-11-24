@@ -1,4 +1,4 @@
-﻿# ad2_lib.ps1 -- shared helpers for driving AnadigmDesigner2 over COM.
+# ad2_lib.ps1 -- shared helpers for driving AnadigmDesigner2 over COM.
 #
 # ASCII ONLY. Windows PowerShell reads .ps1 files as the system ANSI code page
 # when there is no BOM, so any non-ASCII character here becomes garbage.
@@ -219,13 +219,39 @@ function AD2-AddDcSource {
 }
 
 # Run the simulator for $EndMs milliseconds and block until it stops.
-# Returns 'ok', 'error' or 'timeout'.
+# Returns 'ok', 'error', 'stalled' or 'timeout'.
+#
+# 'stalled' is the important one. When AD2 refuses the netlist it does NOT raise
+# a COM error: it pops a modal box, IsRunning reports true for ever, and
+# CurrentIteration stays at 0. A healthy run has CurrentIteration > 0 within the
+# first clock, so one look after StallMs is enough to tell the two apart - and it
+# turns a 90 s timeout into a 1.5 s, unambiguous failure.
+#
+# Recovery: a second Start() in the same session never succeeds. Dismiss the box
+# with AD2-DismissDialogs, then restart AD2 (AD2-Close + AD2-Open) and rebuild.
 function AD2-Run {
-    param($App, [double]$EndMs, [int]$TimeoutSec = 600)
+    param($App, [double]$EndMs, [int]$TimeoutSec = 600, [int]$StallMs = 1500)
     $sim = $App.Simulator
     $sim.EndTime = $EndMs
-    try { $sim.Start() } catch { AD2-Log ('  start threw: ' + $_.Exception.Message.Split([char]10)[0]) }
+    try { $sim.Start() } catch {
+        AD2-Log ('  start threw: ' + $_.Exception.Message.Split([char]10)[0])
+        return 'error'
+    }
     $sw = [Diagnostics.Stopwatch]::StartNew()
+
+    Start-Sleep -Milliseconds $StallMs
+    $it = -1
+    try { $it = $sim.CurrentIteration } catch { }
+    $running = $true
+    try { $running = $sim.IsRunning } catch {
+        AD2-Log ('  SIMERR: ' + ($_.Exception.Message -replace "`r`n", ' | '))
+        return 'error'
+    }
+    if ($running -and $it -le 0) {
+        AD2-Log '  STALLED: CurrentIteration still 0, netlist rejected (modal dialog on screen)'
+        return 'stalled'
+    }
+
     while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
         $running = $true
         try { $running = $sim.IsRunning } catch {
@@ -272,3 +298,14 @@ function AD2-ChoiceText {
 
 
 
+# Dismiss any modal Simulation Error dialog currently on screen, ticking the
+# "Don't show this message again" box first so it stops re-opening.
+function AD2-DismissDialogs {
+    param([string]$Helper = '', [int]$WaitSec = 8)
+    if (-not $Helper) { $Helper = Join-Path $PSScriptRoot 'suppress_dialogs.ps1' }
+    if (-not (Test-Path $Helper)) { AD2-Log '  no suppress_dialogs.ps1 next to ad2_lib.ps1'; return '' }
+    $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Helper -Seconds $WaitSec 2>&1
+    $txt = ($out -join ' ').Trim()
+    AD2-Log ('  dismiss: ' + $txt)
+    return $txt
+}

@@ -148,15 +148,16 @@ $sim = $app.Simulator
 $sim.Probes.DeleteAll()
 $sim.Probes.Add((AD2-Ct $camX 'Out'))
 $sim.EndTime = 20                                  # MILLISECONDS
-try { $sim.Start() } catch { Log "start threw: $($_.Exception.Message)" }
-# wrap IsRunning: a simulation error surfaces as a COM exception whose message
-# carries the useful text ("zero-delay loop", "Input2 is not connected", ...)
-while ($true) {
-    $r = $true
-    try { $r = $sim.IsRunning } catch { Log $_.Exception.Message; break }
-    if (-not $r) { break }
-    Start-Sleep -Milliseconds 300
+$sim.Start()                      # returns immediately even if the netlist is bad
+Start-Sleep -Milliseconds 1500
+# A rejected netlist does NOT throw: IsRunning stays true for ever and
+# CurrentIteration stays at 0. A healthy run has CurrentIteration > 0 by now.
+if ($sim.IsRunning -and $sim.CurrentIteration -le 0) {
+    # stalled. Dismissing the box does not unblock it; restart AD2 and rebuild.
+    & "$PSScriptRoot\suppress_dialogs.ps1" -Seconds 8
+    throw 'netlist rejected - restart AD2 (see PITFALLS 19)'
 }
+while ($sim.IsRunning) { Start-Sleep -Milliseconds 300 }
 $sim.SaveSimulatorData($csvPath)
 $app.Document.SaveAs($ad2Path, $true)
 ```
@@ -220,15 +221,18 @@ before believing any dynamics you see. `scripts/verify_equations.py` does this.
 ## Files
 
 ```
-scripts/ad2_lib.ps1            dot-source: retry, contacts, options, wiring
-scripts/watchdog.ps1           closes AD2 modal dialogs (run in its own process)
+scripts/ad2_lib.ps1            dot-source: retry, contacts, options, wiring,
+                               AD2-Run with stall detection, AD2-DismissDialogs
 scripts/probe.ps1              dump every CAM type / option / parameter of a doc
 scripts/build_example.ps1      full worked build (10 CAM, 2 chips, cross-chip IO)
 scripts/run_dump.ps1           open a doc, run, dump CSV
 scripts/verify_equations.py    recover state equations by regression
+scripts/suppress_dialogs.ps1   click the modal error box away (ticks "Don't show")
+scripts/test_stall.ps1         regression test: valid / stalled / after-restart
+scripts/watchdog.ps1           legacy: closes dialogs blindly (see PITFALLS 19)
 reference/COM_API.md           verified API surface and object model
 reference/CAM_CATALOG.md       CAM types, contacts, options, parameters
-reference/PITFALLS.md          every trap with symptom and fix
+reference/PITFALLS.md          every trap, including the stall mechanism (19, 20)
 ```
 
 

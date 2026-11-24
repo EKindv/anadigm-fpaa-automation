@@ -1,4 +1,4 @@
-﻿# watchdog.ps1 -- keep AnadigmDesigner2 from wedging itself behind modal dialogs.
+# watchdog.ps1 -- keep AnadigmDesigner2 from wedging itself behind modal dialogs.
 #
 # AD2 raises modal dialogs for almost every error (resource exhaustion, an
 # unconnected pin, a zero-delay loop). While a modal dialog is up the automation
@@ -74,4 +74,3 @@ while ((Get-Date) -lt $deadline) {
 if ($LogFile) {
     Add-Content -Path $LogFile -Value ((Get-Date -Format 'HH:mm:ss') + ' watchdog exit') -Encoding UTF8
 }
-

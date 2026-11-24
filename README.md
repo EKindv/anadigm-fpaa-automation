@@ -39,7 +39,7 @@ reference/               COM object model, CAM catalogue, 18 traps
 See `README.md` below for installation and a worked example.
 
 ---
-# anadigm-fpaa-automation
+## anadigm-fpaa-automation
 
 An agent skill for driving **AnadigmDesigner2** (AD2) switched-capacitor FPAA
 designs by COM automation on Windows: build CAM networks, wire chips including
@@ -210,5 +210,6 @@ Two practical notes:
   nonsense (R2 around 0.7 and coefficients off by 2x). The default width of 21
   samples (~2.6 us at 4 MHz) is a reasonable starting point; raise it if the
   R2 of the harder channels stays low.
+
 
 

@@ -1,4 +1,4 @@
-﻿# probe.ps1 -- dump everything AnadigmDesigner2 knows about a CAM and an IO cell.
+# probe.ps1 -- dump everything AnadigmDesigner2 knows about a CAM and an IO cell.
 #
 # Two modes:
 #   1. catalog: create one of every CAM type on a scratch chip and print all of
@@ -99,5 +99,4 @@ if ($Catalog) {
 } else {
     Write-Output 'usage: probe.ps1 -Catalog -Template <ad2>   |   probe.ps1 -Doc <ad2>'
 }
-
 

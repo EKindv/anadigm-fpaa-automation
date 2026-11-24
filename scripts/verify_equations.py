@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 """Recover the state equations a circuit actually implements, by regression.
 
 Give it a waveform dump (AnadigmDesigner2 CSV, a scope capture, anything with
@@ -205,4 +205,3 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-

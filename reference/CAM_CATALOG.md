@@ -1,4 +1,4 @@
-﻿# CAM catalogue (as probed from AnadigmApex 1.x)
+# CAM catalogue (as probed from AnadigmApex 1.x)
 
 Obtained with `scripts/probe.ps1 -Catalog`. Contacts are listed in the order
 `Contacts.Item(i)` returns them, which is not alphabetical.
@@ -255,5 +255,4 @@ Nine entries per chip: `IOCell1..7` (analog, indices `0..5` and `8`),
 
 `AnadigmApex\Gain` does not exist - `Cams.Add` throws `RPC_E_SERVERFAULT`. Use
 `GainHold` or `GainPolarity` instead.
-
 

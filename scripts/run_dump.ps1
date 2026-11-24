@@ -1,4 +1,4 @@
-﻿# run_dump.ps1 -- open an existing .ad2, run the simulator, dump the waveform.
+# run_dump.ps1 -- open an existing .ad2, run the simulator, dump the waveform.
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File run_dump.ps1 `
 #       -Doc "C:\path\circuit.ad2" -Csv "C:\path\wave.csv" -EndMs 20 `
@@ -64,7 +64,6 @@ if ($result -eq 'ok') {
     $null = AD2-Dump -App $app -CsvPath $Csv
 }
 AD2-Close $app
-
 
 
 

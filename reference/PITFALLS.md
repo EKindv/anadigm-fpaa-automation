@@ -1,5 +1,11 @@
 ﻿# Traps, with symptom and fix
 
+> **Correction, measured 2026-11-22.** Trap 1 below records the first diagnosis
+> and its numbers are right, but the mechanism is not: closing the modal box does
+> **not** unblock anything, and the API never throws. The fully characterised
+> behaviour is trap 19 - read that one first. The reliable signal is
+> `Simulator.CurrentIteration == 0`, not the dialog.
+
 Ordered by how much time they cost. Every one of these was hit for real.
 
 ---
@@ -252,3 +258,70 @@ Related, and equally silent: a document is only fully bound on its **second**
 `Start()` call after opening, so a short warm-up run before the real one is
 cheap insurance.
 
+---
+
+## 19. A rejected netlist STALLS - it does not raise an error (supersedes trap 1)
+
+**Symptom** `Simulator.Start()` returns at once. `Simulator.IsRunning` then
+reports `true` for ever. No COM exception is ever thrown, no waveform is produced,
+and a modal `Simulation Error` box sits on screen. A script that waits for
+`IsRunning` to go false hangs until its own timeout - 90 s in our first runner.
+
+**Measured behaviour** (each row was tested, not assumed):
+
+| attempt | what actually happens |
+| --- | --- |
+| close the box (ESC, `WM_CLOSE`, or click OK) | box disappears, AD2 re-raises it immediately; nothing unblocks |
+| tick *"Don't show this message again"* then OK | suppresses the box for the rest of **that process only**; it comes back after a restart |
+| call `Start()` a second time in the same session | **never recovers** (waited 60 s) |
+| read the message text out of the dialog | impossible - the text is owner-drawn; the only child controls are the two buttons |
+| look at `Simulator.CurrentIteration` | **0 for ever** on a rejected netlist; **> 0 within the first clock** on a healthy run |
+| kill AD20, reopen the document, run again | **recovers completely** |
+
+**Fix: detect, do not cure.** `AD2-Run` samples `CurrentIteration` 1.5 s after
+`Start()` and returns `'stalled'` instead of waiting out the timeout, which turns
+a 90 s hang into a 1.5 s unambiguous failure:
+
+```powershell
+$sim.EndTime = $EndMs
+$sim.Start()
+Start-Sleep -Milliseconds 1500
+$running = $sim.IsRunning
+if ($running -and $sim.CurrentIteration -le 0) { return 'stalled' }
+```
+
+Recovery sequence:
+
+```powershell
+$r = AD2-Run -App $app -EndMs 20
+if ($r -eq 'stalled') {
+    $null = AD2-DismissDialogs     # makes the UI usable again, ticks "Don't show"
+    AD2-Close $app                 # a second Start in this session will NOT work
+    $app = AD2-Open -Path $doc     # fresh process, then rebuild and retry
+}
+```
+
+`AD2-DismissDialogs` clicks the box (ticking the checkbox first) so you can see
+the schematic again; `suppress_dialogs.ps1` is the same thing as a standalone
+tool. Neither of them unblocks the simulator - only the restart does.
+
+**Prevention beats all of this.** The two causes we hit most often are covered by
+traps 6 and 20.
+
+---
+
+## 20. Reusing a saved document leaves IO cells in Output mode with no driver
+
+**Symptom** After opening an existing `.ad2`, clearing its CAMs and building a new
+circuit, the run stalls. Nothing you connected looks wrong.
+
+**Cause** The IO cells keep the modes they had when the file was saved. A cell
+left in `Output` mode with nothing wired to its internal `In` contact is a netlist
+error in its own right ("Output contact ... is driving a wire while its input
+contacts are not connected to Voltage sources"), and it is invisible in the CAM
+list.
+
+**Fix** After clearing, put every IO cell you are not using back into a safe
+state, or start from a template whose IO cells are all `Input`. When in doubt,
+open the saved document in the GUI once and look at the IO cells before scripting
+against it.

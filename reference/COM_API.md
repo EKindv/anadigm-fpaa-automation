@@ -1,4 +1,4 @@
-﻿# Verified COM surface of AnadigmDesigner2
+# Verified COM surface of AnadigmDesigner2
 
 Everything below was confirmed against real runs. There is no vendor
 documentation; this is what the object model actually exposes.
@@ -145,5 +145,4 @@ CAM.
 - No access to the oscilloscope window.
 - No batch or headless flag: the GUI window exists even when `Visible = $false`.
 - The simulator is **single threaded**; there is nothing to tune.
-
 

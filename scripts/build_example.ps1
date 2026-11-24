@@ -1,4 +1,4 @@
-﻿# build_example.ps1 -- complete worked example: a 4-dimensional chaotic system on
+# build_example.ps1 -- complete worked example: a 4-dimensional chaotic system on
 # two AN231E04 chips, 10 CAMs, cross-chip feedback, zero-delay loops broken with
 # Hold CAMs. Copy this file and edit section 2 to build your own system.
 #
@@ -152,5 +152,4 @@ $result = AD2-Run -App $app -EndMs $EndMs
 if ($result -eq 'ok') { $null = AD2-Dump -App $app -CsvPath $Csv }
 $null = AD2-Save -App $app -Path $Out
 AD2-Close $app
-
 
