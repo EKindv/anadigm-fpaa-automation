@@ -11,6 +11,9 @@
 # document, rebuilding the netlist) even when nothing is actually wrong.
 
 $script:AD2Log = $null
+# Captured while this file executes, so functions can find the helper scripts
+# even when they are called from a script in another directory.
+$script:Ad2LibDir = $PSScriptRoot
 
 function AD2-Init {
     param([string]$LogPath)
@@ -40,18 +43,49 @@ function AD2-Retry {
 # Start AD2 and open a document. Returns the Application object.
 # IMPORTANT: keep AD2 VISIBLE. A hidden instance runs the simulation fine but
 # SaveSimulatorData then writes only the time column.
+#
+# Opening can BLOCK. If the saved design does not fit the chip, AD2 asks
+# "Not enough resources ... Do you want to keep these settings?" and waits for a
+# human - measured at 111.89 s for one document. That box is raised while
+# Document.Open is still on the stack, so this process cannot dismiss it. A
+# helper process is therefore started FIRST and answers it with "No" (revert),
+# which keeps the design consistent with what the chip can actually hold.
 function AD2-Open {
-    param([string]$Path, [switch]$Hidden)
+    param([string]$Path, [switch]$Hidden, [switch]$NoDialogHelper, [int]$HelperSec = 120)
     Get-Process AD20 -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 1200
+
+    $helper = $null
+    if (-not $NoDialogHelper) {
+        $hp = Join-Path $script:Ad2LibDir 'suppress_dialogs.ps1'
+        if (Test-Path $hp) {
+            $hlog = if ($script:AD2Log) { $script:AD2Log -replace '\.log$', '_dlg.log' } else { Join-Path $env:TEMP 'ad2_dlg.log' }
+            $helper = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+                '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $hp,
+                '-Seconds', "$HelperSec", '-IntervalMs', '200', '-LogFile', $hlog
+            ) -PassThru -WindowStyle Hidden
+            Start-Sleep -Milliseconds 700
+        } else {
+            AD2-Log '  no suppress_dialogs.ps1 next to ad2_lib.ps1; dialogs will not be answered'
+        }
+    }
+
     $app = New-Object -ComObject 'AnadigmDesigner2.Application'
     $app.Visible = (-not $Hidden)
-    $app.Document.Open($Path, 0, $false, $false)
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    try { $app.Document.Open($Path, 0, $false, $false) }
+    catch { AD2-Log ('  open threw: ' + $_.Exception.Message.Split([char]10)[0]) }
+    $sw.Stop()
+    if ($sw.Elapsed.TotalSeconds -ge 5) {
+        AD2-Log ('  open took ' + [math]::Round($sw.Elapsed.TotalSeconds, 1) + ' s (a modal dialog was probably waiting)')
+    }
+
     # the object model answers only after the document is really loaded
     for ($k = 0; $k -lt 40; $k++) {
         try { if ($app.Workspace.Chips.Count -ge 1) { break } } catch { }
         Start-Sleep -Milliseconds 400
     }
+    if ($helper) { try { Stop-Process -Id $helper.Id -Force -ErrorAction SilentlyContinue } catch { } }
     AD2-Log ('opened ' + $Path + '  chips=' + $app.Workspace.Chips.Count)
     return $app
 }

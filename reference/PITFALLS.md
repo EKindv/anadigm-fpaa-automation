@@ -370,3 +370,82 @@ t=33.5s  finished, counter back to 0
 The counter climbs monotonically from the very first clock, so by the 1.5 s check
 a healthy run is already in the thousands. Only a run frozen at exactly 0 is
 reported as `stalled`.
+
+---
+
+## 22. The resource dialog BLOCKS `Document.Open` - answer it from another process
+
+**Symptom** Opening a saved design that does not fit its chip hangs the script for
+minutes. In the GUI a modal box is waiting:
+
+```
+AnadigmDesigner(R)2
+Not enough resources available in chip "FPAA1" to accommodate this configuration
+of CAM "mult". ... Do you want to keep these settings?      [Yes] [No]
+```
+
+Measured: `Document.Open` took **111.89 s** because a human eventually clicked it.
+
+**Why a watchdog that only closes things never helped** Two separate mistakes:
+
+1. The dialog's title is `AnadigmDesigner(R)2` - the registered-trademark character
+   reads back as `?`. A dismissal helper that skips titles containing
+   "AnadigmDesigner" (to protect the main frame) skips this dialog too. Match on
+   the window class `#32770` instead; the main frame is never a `#32770`.
+2. The box is raised while `Document.Open` is still on the stack, so the calling
+   process is inside the COM call and cannot answer anything. The helper must
+   already be running **before** `Open` is called.
+
+**Answer YES, not No.** Verified behaviour:
+
+| answer | what happens |
+| --- | --- |
+| **Yes** | the saved settings are kept, `Open` returns, the document loads as-saved (**4.9 s total**) |
+| No | AD2 reopens a blocking `Set CAM Parameters` dialog for that CAM; the load went through four dialog rounds and took 31 s |
+
+`Yes` therefore means "load the file as it is", which is exactly what automation
+wants. Use `No` only when you deliberately want AD2 to back out of the saved
+placement.
+
+**Fix** `AD2-Open` starts `suppress_dialogs.ps1` as a hidden child process before
+touching COM, and kills it afterwards:
+
+```powershell
+$helper = Start-Process powershell -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass',
+          '-File', $hp, '-Seconds', '120', '-LogFile', $hlog) -PassThru -WindowStyle Hidden
+Start-Sleep -Milliseconds 700
+$app.Document.Open($Path, 0, $false, $false)
+Stop-Process -Id $helper.Id -Force
+```
+
+The helper answers: `Simulation Error` -> tick "Don't show" + OK; any other
+`#32770` with Yes/No -> **Yes**; any other `#32770` with only OK -> OK. It never
+touches `Oscilloscope ...` or `Set CAM Parameters`.
+
+---
+
+## 23. `Add-Type` treats a C# *warning* as an error, and it fails silently
+
+This one cost hours: a dialog-dismissal helper compiled to nothing and every call
+threw "unable to find type", which a `try/catch` around the call swallowed as an
+empty result.
+
+**Symptom** Reflection-heavy helper does nothing at all. No error text anywhere.
+
+**Cause** `Add-Type` compiles with warnings-as-errors. A single unused local
+variable (`string what;` assigned but never read, CS0219) is enough:
+
+```
+error CS0219: variable 'what' is assigned but its value is never used
+```
+
+With `-ErrorAction SilentlyContinue` on the `Add-Type` call, the failure is
+invisible and `[MyType]` simply does not exist afterwards.
+
+**Fix** Never pass `-ErrorAction SilentlyContinue` to `Add-Type`, and smoke-test a
+new helper standalone before wiring it into a pipeline:
+
+```powershell
+try { Add-Type -TypeDefinition $code -ErrorAction Stop; 'COMPILE OK' }
+catch { 'COMPILE FAILED: ' + $_.Exception.Message }
+```
